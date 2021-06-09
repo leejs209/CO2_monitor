@@ -7,6 +7,19 @@
 #include <SoftwareSerial.h>
 #include "RTClib.h"
 
+
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
 #define chipSelect 5
 #define DHTPIN 2     // 온도센서 핀
 #define DHTTYPE DHT22   // DHT 22  (AM2302)
@@ -34,6 +47,15 @@ void setup()
     Serial.begin(9600);
     // Serial.println("CO2 & Temp & Humidity Logger");
 
+    
+    // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+      Serial.println(F("SSD1306 allocation failed"));
+      for(;;); // Don't proceed, loop forever
+    }
+
+    display.display();
+    
     // CO2 센서
     mhzSerial.begin(9600);
     while ( !mhz19b.detect() ) {
@@ -89,6 +111,10 @@ void loop()
 //    digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
     int16_t result;
     String print_val = "";
+    String val = "";
+    String co2_disp = "";
+    String temp_disp = "";
+    String hum_disp = "";
     float t;
     float h;
     
@@ -135,13 +161,40 @@ void loop()
             DateTime now = rtc.now();
             print_val += now.timestamp(DateTime::TIMESTAMP_FULL);
             print_val += ",";
-            print_val += String(result);
-            print_val += ",";
-            print_val += t;
-            print_val += ",";
-            print_val += h;
+            val += String(result);
+            val += ",";
+            val += t;
+            val += ",";
+            val += h;
+            print_val += val;
             
             Serial.println(print_val);
+    
+            // 디스플레이에 표시
+            co2_disp += "CO2: ";
+            co2_disp += String(result);
+            co2_disp += " ppm";
+
+            temp_disp += "Temp: ";
+            temp_disp += t;
+            temp_disp += " C";
+
+            hum_disp += "Humidity: ";
+            hum_disp += h;
+            hum_disp += " %";
+            
+            display.clearDisplay();
+            display.setTextSize(1);      // Normal 1:1 pixel scale
+            display.setTextColor(SSD1306_WHITE); // Draw white text
+            //display.setCursor(0, 0);
+            //display.println(now.year() + '-' + now.month() + '-' + now.day() + ' ' + now.hour() + ':' + now.minute() + ':' + now.second());
+            display.setCursor(0, 0);     // Start at top-left corner
+            display.println(co2_disp);
+            display.setCursor(0, 10);
+            display.println(temp_disp);
+            display.setCursor(0, 20);
+            display.println(hum_disp);
+            display.display();
             
             File dataFile = SD.open("/datalog.txt", FILE_WRITE);
             
